@@ -1,0 +1,70 @@
+---
+title: "Week 2 Assignment"
+output: html_document
+---
+###SQL and R
+####Elina Azrilyan
+####8 September 2018
+
+Choose six recent popular movies. Ask at least five people that you know (friends, family, classmates, imaginary friends) to rate each of these movie that they have seen on a scale of 1 to 5. Take the results (observations) and store them in a SQL database. Load the information into an R dataframe.
+
+Your deliverables should include your SQL scripts and your R Markdown code, posted to GitHub. This is by design a very open ended assignment. A variety of reasonable approaches are acceptable. You can (and should) blank out your SQL password if your solution requires it; otherwise, full credit requires that your code is “reproducible,” with the assumption that I have the same database server and R software. You may work in a small group.
+```{r}
+# loading package
+# install.packages("RMySQL")
+# install.packages("dplyr")
+library(RMySQL)
+```
+#####Establish connection
+```{r}
+con <- dbConnect(MySQL(), user='root', password='root', dbname='MR', host='localhost')
+```
+#####Run a query to create a table which now contains the summary of movies and their respective ratings
+```{r}
+mr <- dbGetQuery(con, "SELECT m.movieid AS ID, m.movietitle AS Title, m.releaseyear AS 'Year', m.genre AS Genre, m.rtscore AS 'RTScore', r.friendname, r.friendrating
+  FROM Movies m
+    INNER JOIN Ratings r ON m.movieid = r.movieid
+  ORDER BY m.movieid;")
+
+# Disconecting from Database
+dbDisconnect(con)
+
+head(mr)
+```
+
+#####Calculate average movie rating based on opinion of my friends. RTScore = Rotten Tomatoes Score. 
+```{r message=FALSE}
+library(dplyr)
+newmr <- mr %>%
+ group_by(Title,Year, Genre, RTScore) %>%
+ summarise(AvgRating = mean(friendrating))
+newmrframe <- as.data.frame(newmr)
+newmrframe
+```
+#####Let's convert Rotten Tomatoes Score to a 5 point scale to make comparison easier.
+```{r}
+newmrframe$RTScoreConv<-newmrframe$RTScore/100*5
+newmrframe
+```
+
+######The obvious difference in scores is due to the sample size I was using. A sample size of 5 is clearly not large enough. Opinion of 1 person can skew the results where significantly. 
+
+#####Let's identify which genre my friends prefer.
+```{r}
+newmrfriend <- mr %>%
+ group_by(Genre) %>%
+ summarise(AvgRating = mean(friendrating))
+newmrfriendframe <- as.data.frame(newmrfriend)
+newmrfriendframe
+```
+#####My friends seem to prefer Drama.
+
+#####Let's identify who is the harshest critic.
+```{r}
+newmrcr <- mr %>%
+ group_by(friendname) %>%
+ summarise(AvgRating = round(mean(friendrating), digits = 2))
+newmrcrframe <- as.data.frame(newmrcr)
+newmrcrframe
+```
+#####Not surprisingly, my picky friend Lilya is showing the lowest average results and Andrey who likes Action movies is showing the highest score (3 out of 6 films were from that Genre).
